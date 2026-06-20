@@ -1,0 +1,369 @@
+'''import tkinter as tk
+import socket
+from tkinter import *
+from VotingPage import votingPg
+import iris_integration
+import camera_module
+
+def establish_connection():
+    try:
+        host = socket.gethostname()
+        port = 4001
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        print(client_socket)
+        message = client_socket.recv(1024)
+        if message.decode() == "Connection Established":
+            return client_socket
+        else:
+            return 'Failed'
+    except:
+        print("Connection Failed, check if server is running...")
+        return 'Failed'
+
+def failed_return(root, frame1, client_socket, message):
+    for widget in frame1.winfo_children():
+        widget.destroy()
+    message = message + "... \nTry again..."
+    Label(frame1, text=message, font=('Helvetica', 12, 'bold')).grid(row=1, column=1)
+    try:
+        client_socket.close()
+    except:
+        return
+
+def log_server(root, frame1, client_socket, voter_ID, password):
+    if not (voter_ID and password):
+        voter_ID = "0"
+        password = "x"
+    message = voter_ID + " " + password
+    client_socket.send(message.encode())
+    message = client_socket.recv(1024)
+    message = message.decode()
+    if message == "Authenticate":
+        camera_module.capture_iris_image("voter_iris.jpg")
+        iris_verified, iris_message = iris_integration.verify_iris("voter_iris.jpg")
+        if iris_verified:
+            votingPg(root, frame1, client_socket)
+        else:
+            failed_return(root, frame1, client_socket, f"Iris verification failed: {iris_message}")
+    elif message == "VoteCasted":
+        message = "Vote has Already been Cast"
+        failed_return(root, frame1, client_socket, message)
+    elif message == "InvalidVoter":
+        message = "Invalid Voter"
+        failed_return(root, frame1, client_socket, message)
+    else:
+        message = "Server Error"
+        failed_return(root, frame1, client_socket, message)
+
+def voterLogin(root, frame1):
+    client_socket = establish_connection()
+    if client_socket == 'Failed':
+        message = "Connection failed"
+        failed_return(root, frame1, client_socket, message)
+        return
+    root.title("Voter Login")
+    for widget in frame1.winfo_children():
+        widget.destroy()
+    Label(frame1, text="Voter Login", font=('Helvetica', 18, 'bold')).grid(row=0, column=2, rowspan=1)
+    Label(frame1, text="").grid(row=1, column=0)
+    Label(frame1, text="Voter ID:      ", anchor="e", justify=LEFT).grid(row=2, column=0)
+    Label(frame1, text="Password:   ", anchor="e", justify=LEFT).grid(row=3, column=0)
+    voter_ID = tk.StringVar()
+    password = tk.StringVar()
+    e1 = Entry(frame1, textvariable=voter_ID)
+    e1.grid(row=2, column=2)
+    e3 = Entry(frame1, textvariable=password, show='*')
+    e3.grid(row=3, column=2)
+    sub = Button(frame1, text="Login", width=10, command=lambda: log_server(root, frame1, client_socket, voter_ID.get(), password.get()))
+    Label(frame1, text="").grid(row=4, column=0)
+    sub.grid(row=5, column=3, columnspan=2)
+    frame1.pack()
+    root.mainloop()'''
+
+'''import tkinter as tk
+import socket
+from tkinter import *
+from VotingPage import votingPg
+import camera_module
+import cv2
+import numpy as np
+
+# Assuming you have the following functions from your iris processing code:
+# segment_iris, extract_features, match_iris_template, etc.
+
+def establish_connection():
+    try:
+        host = socket.gethostname()
+        port = 4001
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        print(client_socket)
+        message = client_socket.recv(1024)
+        if message.decode() == "Connection Established":
+            return client_socket
+        else:
+            return 'Failed'
+    except Exception as e:
+        print(f"Connection Failed, check if server is running... Error: {e}")
+        return 'Failed'
+
+def failed_return(root, frame1, client_socket, message):
+    for widget in frame1.winfo_children():
+        widget.destroy()
+    message = message + "... \nTry again..."
+    Label(frame1, text=message, font=('Helvetica', 12, 'bold')).grid(row=1, column=1)
+    try:
+        if client_socket != 'Failed': # only close if a socket was created.
+            client_socket.close()
+    except Exception as e:
+        print(f"Error closing socket: {e}")
+
+def log_server(root, frame1, client_socket, voter_ID, password):
+    if not (voter_ID and password):
+        voter_ID = "0"
+        password = "x"
+    message = voter_ID + " " + password
+    try:
+        client_socket.send(message.encode())
+        message = client_socket.recv(1024).decode()
+        if message == "Authenticate":
+            camera_module.capture_iris_image("voter_iris.jpg")
+            image = cv2.imread("voter_iris.jpg", cv2.IMREAD_GRAYSCALE)
+            if image is None:
+                raise ValueError("Error loading iris image.")
+            
+            # Use the iris_integration module for iris processing:
+            from iris_integration import segment_iris, extract_features, match_iris_template
+
+            segmented_iris = segment_iris(image)
+            if segmented_iris is None:
+                raise ValueError("Iris segmentation failed.")
+            features = extract_features(segmented_iris)
+            if features is None:
+                raise ValueError("Feature extraction failed.")
+
+            iris_verified, iris_message = match_iris_template(features)
+
+            if iris_verified:
+                votingPg(root, frame1, client_socket)
+            else:
+                failed_return(root, frame1, client_socket, f"Iris verification failed: {iris_message}")
+        elif message == "VoteCasted":
+            message = "Vote has Already been Cast"
+            failed_return(root, frame1, client_socket, message)
+        elif message == "InvalidVoter":
+            message = "Invalid Voter"
+            failed_return(root, frame1, client_socket, message)
+        else:
+            message = "Server Error"
+            failed_return(root, frame1, client_socket, message)
+    except Exception as e:
+        failed_return(root, frame1, client_socket, f"Server communication error: {e}")
+
+def voterLogin(root, frame1):
+    client_socket = establish_connection()
+    if client_socket == 'Failed':
+        message = "Connection failed"
+        failed_return(root, frame1, client_socket, message)
+        return
+    root.title("Voter Login")
+    for widget in frame1.winfo_children():
+        widget.destroy()
+    Label(frame1, text="Voter Login", font=('Helvetica', 18, 'bold')).grid(row=0, column=2, rowspan=1)
+    Label(frame1, text="").grid(row=1, column=0)
+    Label(frame1, text="Voter ID:      ", anchor="e", justify=LEFT).grid(row=2, column=0)
+    Label(frame1, text="Password:   ", anchor="e", justify=LEFT).grid(row=3, column=0)
+    voter_ID = tk.StringVar()
+    password = tk.StringVar()
+    e1 = Entry(frame1, textvariable=voter_ID)
+    e1.grid(row=2, column=2)
+    e3 = Entry(frame1, textvariable=password, show='*')
+    e3.grid(row=3, column=2)
+    sub = Button(frame1, text="Login", width=10, command=lambda: log_server(root, frame1, client_socket, voter_ID.get(), password.get()))
+    Label(frame1, text="").grid(row=4, column=0)
+    sub.grid(row=5, column=3, columnspan=2)
+    frame1.pack()
+    root.mainloop()'''
+
+# voter.py
+'''import tkinter as tk
+import socket
+from tkinter import *
+from VotingPage import votingPg
+import camera_module
+import cv2
+import numpy as np
+import iris_integration
+
+def establish_connection():
+    try:
+        host = socket.gethostname()
+        port = 4001
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        print(client_socket)
+        message = client_socket.recv(1024)
+        if message.decode() == "Connection Established":
+            return client_socket
+        else:
+            return 'Failed'
+    except Exception as e:
+        print(f"Connection Failed, check if server is running... Error: {e}")
+        return 'Failed'
+
+def failed_return(top_level, frame, client_socket, message):
+    for widget in frame.winfo_children():
+        widget.destroy()
+    message = message + "... \nTry again..."
+    Label(frame, text=message, font=('Helvetica', 12, 'bold')).grid(row=1, column=1)
+    try:
+        if client_socket != 'Failed':
+            client_socket.close()
+    except Exception as e:
+        print(f"Error closing socket: {e}")
+
+def log_server(top_level, client_socket, voter_ID, password):
+    if not (voter_ID and password):
+        voter_ID = "0"
+        password = "x"
+    message = voter_ID + " " + password
+    try:
+        client_socket.send(message.encode())
+        message = client_socket.recv(1024).decode()
+        if message == "Authenticate":
+            camera_module.capture_iris_image("voter_iris.jpg")
+            iris_verified, iris_message = iris_integration.verify_iris("voter_iris.jpg")
+
+            if iris_verified:
+                votingPg(top_level, Frame(top_level), client_socket)
+            else:
+                failed_return(top_level, Frame(top_level), client_socket, f"Iris verification failed: {iris_message}")
+        elif message == "VoteCasted":
+            message = "Vote has Already been Cast"
+            failed_return(top_level, Frame(top_level), client_socket, message)
+        elif message == "InvalidVoter":
+            message = "Invalid Voter"
+            failed_return(top_level, Frame(top_level), client_socket, message)
+        else:
+            message = "Server Error"
+            failed_return(top_level, Frame(top_level), client_socket, message)
+    except Exception as e:
+        failed_return(top_level, Frame(top_level), client_socket, f"Server communication error: {e}")
+
+def voterLogin(root, frame1):
+    top_level = Toplevel(root)
+    top_level.geometry('500x500')
+    client_socket = establish_connection()
+    if client_socket == 'Failed':
+        message = "Connection failed"
+        failed_return(top_level, Frame(top_level), client_socket, message)
+        return
+    top_level.title("Voter Login")
+    frame = Frame(top_level)
+    Label(frame, text="Voter Login", font=('Helvetica', 18, 'bold')).grid(row=0, column=2, rowspan=1)
+    Label(frame, text="").grid(row=1, column=0)
+    Label(frame, text="Voter ID:  ", anchor="e", justify=LEFT).grid(row=2, column=0)
+    Label(frame, text="Password:  ", anchor="e", justify=LEFT).grid(row=3, column=0)
+    voter_ID = tk.StringVar()
+    password = tk.StringVar()
+    e1 = Entry(frame, textvariable=voter_ID)
+    e1.grid(row=2, column=2)
+    e3 = Entry(frame, textvariable=password, show='*')
+    e3.grid(row=3, column=2)
+    sub = Button(frame, text="Login", width=10, command=lambda: log_server(top_level, client_socket, voter_ID.get(), password.get()))
+    Label(frame, text="").grid(row=4, column=0)
+    sub.grid(row=5, column=3, columnspan=2)
+    frame.pack()
+    top_level.mainloop()'''
+
+import tkinter as tk
+import socket
+from tkinter import *
+from VotingPage import votingPg
+import iris_integration  # Import iris integration module
+import camera_module  # Import camera module
+
+def establish_connection():
+    try:
+        host = socket.gethostname()
+        port = 4001
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        print(client_socket)
+        message = client_socket.recv(1024)
+        if message.decode() == "Connection Established":
+            return client_socket
+        else:
+            return 'Failed'
+    except:
+        print("Connection Failed, check if server is running...")
+        return 'Failed'
+
+def failed_return(root, frame1, client_socket, message):
+    for widget in frame1.winfo_children():
+        widget.destroy()
+    message = message + "... \nTry again..."
+    Label(frame1, text=message, font=('Helvetica', 12, 'bold')).grid(row=1, column=1)
+    try:
+        client_socket.close()
+    except:
+        return
+
+def log_server(root, frame1, client_socket, voter_ID, password):
+    if not (voter_ID and password):
+        voter_ID = "0"
+        password = "x"
+    message = voter_ID + " " + password
+    client_socket.send(message.encode())
+    message = client_socket.recv(1024)
+    message = message.decode()
+    if message == "Authenticate":
+       
+        camera_module.capture_iris_image("voter_iris.jpg")  
+        iris_verified, iris_message = iris_integration.verify_iris("voter_iris.jpg") 
+
+        if iris_verified:
+            votingPg(root, frame1, client_socket) 
+        else:
+            failed_return(root, frame1, client_socket, f"Iris verification failed: {iris_message}") 
+    elif message == "VoteCasted":
+        message = "Vote has Already been Cast"
+        failed_return(root, frame1, client_socket, message)
+    elif message == "InvalidVoter":
+        message = "Invalid Voter"
+        failed_return(root, frame1, client_socket, message)
+    else:
+        message = "Server Error"
+        failed_return(root, frame1, client_socket, message)
+
+def voterLogin(root, frame1):
+    client_socket = establish_connection()
+    if client_socket == 'Failed':
+        message = "Connection failed"
+        failed_return(root, frame1, client_socket, message)
+        return
+    root.title("Voter Login")
+    for widget in frame1.winfo_children():
+        widget.destroy()
+    Label(frame1, text="Voter Login", font=('Helvetica', 18, 'bold')).grid(row=0, column=2, rowspan=1)
+    Label(frame1, text="").grid(row=1, column=0)
+    Label(frame1, text="Voter ID:      ", anchor="e", justify=LEFT).grid(row=2, column=0)
+    Label(frame1, text="Password:   ", anchor="e", justify=LEFT).grid(row=3, column=0)
+    voter_ID = tk.StringVar()
+    password = tk.StringVar()
+    e1 = Entry(frame1, textvariable=voter_ID)
+    e1.grid(row=2, column=2)
+    e3 = Entry(frame1, textvariable=password, show='*')
+    e3.grid(row=3, column=2)
+    sub = Button(frame1, text="Login", width=10, command=lambda: log_server(root, frame1, client_socket, voter_ID.get(), password.get()))
+    Label(frame1, text="").grid(row=4, column=0)
+    sub.grid(row=5, column=3, columnspan=2)
+    frame1.pack()
+    root.mainloop()
+
+# if __name__ == "__main__":
+#     root = Tk()
+#     root.geometry('500x500')
+#     frame1 = Frame(root)
+#     voterLogin(root, frame1)
