@@ -1,8 +1,0 @@
-,voter_id,Name,Gender,Zone,City,Passw,hasVoted
-0,10001,Deep,Male,West,Gandhinagar,abcd,1
-1,10002,Prachi,Female,South,Surat,abcd,1
-2,10003,Het,Male,East,Surat,abcd,1
-3,10004,Shivanshi,Female,East,Gandhinagar,abcd,1
-4,10005,Dev,Male,North,Ahmedabad,abcd,1
-5,10006,Dharun,Male,North,Indore,bcde,0
-6,10007,Khushi,Female,North,Ranchi,1234,0
